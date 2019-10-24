@@ -49,7 +49,7 @@ def main():
         print 'input arg:     --expdir = %s' % repr(args.expdir)
         sys.exit(1)
 
-    gfs_steps = ['prep', 'anal', 'fcst', 'postsnd', 'post', 'awips', 'gempak', 'vrfy', 'arch']
+    gfs_steps = ['prep', 'anal', 'gldas', 'fcst', 'postsnd', 'post', 'awips', 'gempak', 'vrfy', 'arch']
     hyb_steps = ['eobs', 'eomg', 'eupd', 'ecen', 'efcs', 'epos', 'earc']
 
     steps = gfs_steps + hyb_steps if _base.get('DOHYBVAR', 'NO') == 'YES' else gfs_steps
@@ -222,7 +222,7 @@ def get_gdasgfs_resources(dict_configs, cdump='gdas'):
     do_gempak = base.get('DO_GEMPAK', 'NO').upper()
     do_awips = base.get('DO_AWIPS', 'NO').upper()
 
-    tasks = ['prep', 'anal', 'fcst', 'post', 'vrfy', 'arch']
+    tasks = ['prep', 'anal', 'gldas', 'fcst', 'post', 'vrfy', 'arch']
 
     if cdump in ['gfs'] and do_bufrsnd in ['Y', 'YES']:
         tasks += ['postsnd']
@@ -392,9 +392,23 @@ def get_gdasgfs_tasks(dict_configs, cdump='gdas'):
 
     dict_tasks['%sanal' % cdump] = task
 
-    # fcst
+    # gldas
     deps = []
     dep_dict = {'type': 'task', 'name': '%sanal' % cdump}
+    deps.append(rocoto.add_dependency(dep_dict))
+    if dohybvar in ['y', 'Y', 'yes', 'YES']:
+        dep_dict = {'type': 'metatask', 'name': '%sepmn' % 'gdas', 'offset': '-06:00:00'}
+        deps.append(rocoto.add_dependency(dep_dict))
+        dependencies = rocoto.create_dependency(dep_condition='and', dep=deps)
+    else:
+        dependencies = rocoto.create_dependency(dep=deps)
+    task = wfu.create_wf_task('gldas', cdump=cdump, envar=envars, dependency=dependencies)
+
+    dict_tasks['%sgldas' % cdump] = task
+
+    # fcst
+    deps = []
+    dep_dict = {'type': 'task', 'name': '%sgldas' % cdump}
     deps.append(rocoto.add_dependency(dep_dict))
     if cdump in ['gdas']:
         dep_dict = {'type': 'cycleexist', 'condition': 'not', 'offset': '-06:00:00'}

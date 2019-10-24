@@ -36,8 +36,11 @@
         trigger ../prep/jgdas_prep == complete and ../prep/jgdas_emcsfc_sfc_prep == complete
         event 1 release_fcst
     endfamily
-    task jgdas_vminmon
+    task jgdas_gldas
       trigger analysis/jgdas_analysis_high == complete
+    endfamily
+    task jgdas_vminmon
+      trigger analysis/jgdas_analysis_high == complete and gldas/jgdas_gldas == complete
     family forecast
       task jgdas_forecast_high
         trigger ../analysis/jgdas_analysis_high:release_fcst

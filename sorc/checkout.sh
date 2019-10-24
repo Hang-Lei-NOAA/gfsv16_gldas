@@ -9,7 +9,7 @@ if [[ ! -d fv3gfs.fd ]] ; then
     rm -f ${topdir}/checkout-fv3gfs.log
     git clone gerrit:NEMSfv3gfs fv3gfs.fd >> ${topdir}/checkout-fv3gfs.log 2>&1
     cd fv3gfs.fd
-    git checkout gfs.v16_PhysicsUpdate 
+    #git checkout gfs.v16_PhysicsUpdate 
     git submodule update --init --recursive
     cd ${topdir}
 else
@@ -31,8 +31,8 @@ fi
 echo gldas checkout ...
 if [[ ! -d gldas.fd ]] ; then
     rm -f ${topdir}/checkout-gldas.log
-#    git clone https://github.com/NOAA-EMC/GLDAS gldas.fd >> ${topdir}/checkout-gldas.fd.log 2>&1
-    git clone https://github.com/YoulongXia-NOAA/GLDAS.git gldas.fd >> ${topdir}/checkout-gldas.fd.log 2>&1
+    git clone https://github.com/NOAA-EMC/GLDAS gldas.fd >> ${topdir}/checkout-gldas.fd.log 2>&1
+#    git clone https://github.com/YoulongXia-NOAA/GLDAS.git gldas.fd >> ${topdir}/checkout-gldas.fd.log 2>&1
     cd gldas.fd
     git checkout feature/gldasnoahmp
     cd ${topdir}
@@ -45,7 +45,7 @@ if [[ ! -d ufs_utils.fd ]] ; then
     rm -f ${topdir}/checkout-ufs_utils.log
     git clone https://github.com/NOAA-EMC/UFS_UTILS  ufs_utils.fd >> ${topdir}/checkout-ufs_utils.fd.log 2>&1
     cd ufs_utils.fd
-    git checkout develop
+    git checkout release/v2.0.0
     cd ${topdir}
 else
     echo 'Skip.  Directory ufs_utils.fd already exists.'
@@ -54,9 +54,12 @@ fi
 echo EMC_post checkout ...
 if [[ ! -d gfs_post.fd ]] ; then
     rm -f ${topdir}/checkout-gfs_post.log
-    git clone https://github.com/NOAA-EMC/EMC_post gfs_post.fd >> ${topdir}/checkout-gfs_post.log 2>&1
+    #git clone https://github.com/NOAA-EMC/EMC_post gfs_post.fd >> ${topdir}/checkout-gfs_post.log 2>&1
+    #cd gfs_post.fd
+    #git checkout develop
+    git clone https://github.com/yangfanglin/EMC_post.git gfs_post.fd >> ${topdir}/checkout-gfs_post.log 2>&1
     cd gfs_post.fd
-    git checkout develop
+    git checkout inlinepost
     cd ${topdir}
 else
     echo 'Skip.  Directory gfs_post.fd already exists.'
@@ -78,7 +81,7 @@ if [[ ! -d verif-global.fd ]] ; then
     rm -f ${topdir}/checkout-verif-global.log
     git clone --recursive gerrit:EMC_verif-global verif-global.fd >> ${topdir}/checkout-verif-global.log 2>&1
     cd verif-global.fd
-    git checkout verif_global_v1.2.2
+    git checkout verif_global_v1.3.1
     cd ${topdir}
 else
     echo 'Skip. Directory verif-global.fd already exist.'

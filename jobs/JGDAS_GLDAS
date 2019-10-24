@@ -1,192 +1,126 @@
 #!/bin/ksh
+date
+export PS4='$SECONDS + '
 set -x
 
-########################################
-# GLDAS PRODUCT GENERATION
-########################################
-
-export RUN_ENVIR=${RUN_ENVIR:-"nco"}
-export PS4='$SECONDS + '
-date
+#############################################################
+# NOTE: This job depends on the prod_util module being loaded
+#############################################################
 
 #####################################################################################
-# DATA_IN: Location of working directory, default to /tmpnwprd1
+# Run config file to get input parameters
+# NOTE: $gldas_ver must be exported by the submission script prior to running this job (in run_all of lsf directory)!
+# This config file should define the following variables
+# DATA_IN: Location of working directory, default to /tmpnwprd
+# DEV_ECF: If the job is to be running using SMS, default to YES
+# SENDDBN: Set to NO for developers, default to YES
 # COM_IN:  Directory for input files, default to /com/$NET/${envir}
 # COM_OUT: Directory for output file, default to /com/$NET/${envir}
-# gespath: Directory for the IC files
-############################################################################
+# gespath: Directory for the guess or restart files, default to /nwges/${envir}
+# SENDECF: Flag Events on ecFlow
+# SENDCOM: Copy Files From $TMPDIR to $COMOUT
+# SENDDBN: Issue DBNet Client Calls
+#
+# History:  2019 10 15 Jesse Meng and Youlong Xia, first version
+#####################################################################################
+if [ "$RUN_ENVIR" != "nco" ]      ### For Developers
+then
+  export gldas_ver=${gldas_ver:-v2.3.0}
+#  export HOMEgldas=${HOMEgldas:-/gpfs/dell2/emc/modeling/noscrub/$LOGNAME/gldas.${gldas_ver}}
+  export HOMEgldas=${HOMEgldas:-/gpfs/dell2/emc/retros/noscrub/Youlong.Xia/GLDAS}
+  export PARA_CONFIG=${gldas_para_config:-$HOMEgldas/user/gldas_para_config}
+  if [ -s $PARA_CONFIG ] ; then . $PARA_CONFIG ; fi
+  export DATA=${DATA:-/gpfs/dell2/ptmp/$LOGNAME/tmpnwprd}
+  export SENDECF=${SENDECF:-NO}
+  export SENDDBN=${SENDDBN:-NO}
+  export SENDCOM=${SENDCOM:-YES}
+  export jobid="LL${job}_${envir}.o$$"
+  export jlogfile=${jlogfile:-$DATA/jlogfiles/jlogfile.${jobid}}
+fi
 
-#############################
-# Source relevant config files
-#############################
-
-
-
-export EXPDIR=${EXPDIR:-$HOMEgfs/parm/config}
-config_path=${EXPDIR:-$NWROOT/gfs.${gfs_ver}/parm/config}
-export userid=$LOGNAME
-export DATA_IN=${DATA_IN:-/ptmp/$userid}
-
-#configs="base fcst efcs"
-#for config in $configs; do
-#    . $config_path/config.$config
-#    status=$?
-#    [[ $status -ne 0 ]] && exit $status
-#done
-
-
-##########################################
-# Source machine runtime environment
-##########################################
-. $HOMEgfs/env/${machine}.env efcs
-status=$?
-[[ $status -ne 0 ]] && exit $status
-
-
-##############################################
-# Obtain unique process id (pid) and make temp directory
-##############################################
-export pid=${pid:-$$}
-export DATA_IN=${DATA_IN:-/tmpgldas}
-export DATA=$DATA_IN/${job}.${pid}
-#export outid=${outid:-"LL$job"}
-#export DATA=${DATA:-${DATAROOT}/${jobid:?}}
-
+########################################################
+# obtain unique process id and make temp directory
+########################################################
 mkdir -p $DATA
 cd $DATA
 
-##############################################
+export cyc=${cyc:-00}
+export cycle=t${cyc}z
+
+##########################
+# Specify NET and RUN Name
+##########################
+export NET=${NET:-gldas}
+export RUN=${RUN:-gldas}
+
+export model=${model:-noah}
+export MODEL=${MODEL:-`echo $model |tr '[a-z]' '[A-Z]'`}
+
+###########################
+# Define alert_type
+###########################
+if [ "$RUN_ENVIR" = "prod" -a "$envir" != "prod" ]; then
+  export alert_type=GLDAS_GB2_PARA
+fi
+
+export alert_type=${alert_type:-GLDAS_GB2}
+
+export pgmout="OUTPUT.$$"
+
+####################################
+# Specify Execution Areas
+####################################
+export FIXgldas=${FIXgldas:-$HOMEgldas/fix}
+export PARMgldas=${PARMgldas:-$HOMEgldas/parm}
+export EXECgldas=${EXECgldas:-$HOMEgldas/exec}
+export USHgldas=${USHgldas:-$HOMEgldas/ush}
+
+##############################
 # Run setpdy and initialize PDY variables
-##############################################
-export jlogfile=${jlogfile:-/com/logs/${envir}/jlogfile}
-export NET=gdas
-export RUN=gldas
-export cycle="t${cyc}z"
+##############################
 setpdy.sh
 . ./PDY
 
-export CDATE=${PDY}${cyc}
-##############################################
-# Determine Job Output Name on System
-##############################################
-export pgmout="OUTPUT.${pid}"
-export pgmerr=errfile
-
-
-##############################################
-# Set variables used in the exglobal script
-##############################################
-export CDATE=${CDATE:-${PDY}${cyc}}
-export CDUMP=${CDUMP:-${RUN:-"gdas"}}
-if [ $RUN_ENVIR = "nco" ]; then
-    export ROTDIR=${COMROOT:?}/$NET/$envir
-fi
-
-
-##############################################
-# Begin JOB SPECIFIC work
-##############################################
-
-export CASE=$CASE_GLDAS
-
-# COMOUT is used in exglobal script
-# TO DO: Map NCO's directory into these variables
-export COMOUT="$ROTDIR/gldas$CDUMP.$PDY/$cyc"
-
-
-# Get Precip/Flux from GDAS Prep
-export TDPrecip=${DATA_IN}/${}
-export TDFlux  =${DATA_IN}/${}
-
-#################################
-# Define the Log File directory
-#################################
-export jlogfile=${jlogfile:-/com/logs/jlogfiles/jlogfile.${job}.${pid}}
-
-##############################
-# Set up the UTILITIES
-##############################
-export utilscript=${utilscript:-../util/ush}
-export utilexec=${utilexec:-../util/exec}
-export ushscript=${ushscript:-../ush}
-export utilparm=${utilparm:-../util/parm}
-export scripts=${scripts:-../scripts}
-
-# Run setup to initialize working directory and utility scripts
-##############################
-sh $utilscript/setup.sh
-
-###############################################################
-# Run relevant exglobal script
-env
-msg="HAS BEGUN on `hostname`"
-postmsg "$jlogfile" "$msg"
-$LOGSCRIPT
-
-
-${GLDASSH:-$scripts/exgdas_gldas.sh.ecf}
-status=$?
-[[ $status -ne 0 ]] && exit $status
-
-
-# Double check the status in gldas
-GLDASOUT=$COMOUT/gldasic.grp${}
-glpass=0
-if [ -f $GLDASOUT ]; then
-    glpass=$(grep "PASS" $GLDASOUT | wc -l)
-fi
-echo "$glpass/$GLDASOUT members successfull in gldasic.grp${}"
-if [ $glpass -ne $NUM_GLDASOUT ]; then
-    echo "FATAL ERROR: Failed members in group $GLDASOUT, ABORT!"
-    cat $GLDASOUT
-    exit 99
-fi
+export GDATE=${GDATE:-$PDY}
+echo "GLDAS CYCLE = ${GDATE}.${cycle}"
 
 ##############################################
 # Define COM directories
 ##############################################
-export COM_IN=${COM_IN:-/com/${NET}/${envir}}
-export COM_OUT=${COM_OUT:-/com/${NET}/${envir}}
+if [ "$RUN_ENVIR" = "nco" ] ### For nco operation
+then
 
-export COMDIR=${COMDIR:-/com/${NET}/${envir}}
+export gldas_ver=${gldas_ver:-v2.3.0}
+export HOMEgldas=${HOMEgldas:-/gpfs/dell1/nco/ops/nwprod/gldas.${gldas_ver}}
+export PARA_CONFIG=${gldas_para_config:-$HOMEgldas/user/gldas_para_config}
+if [ -s $PARA_CONFIG ] ; then . $PARA_CONFIG ; fi
 
-export COMDMP=${COMDMP:-$COM_IN/cdas.$PDY}
-export COMIN=$COM_IN/cdas.$PDY
-export COMOUT=$COM_OUT/cdas.$PDY
-mkdir -m 775 -p $COMOUT
+export COM_IN=${COM_IN:-${COMROOT:?}/${NET}/${envir}}
+export COM_OUT=${COM_OUT:-${COMROOT}/${NET}/${envir}}
 
-##############################################
-# Define GES directories
-##############################################
-export gespath=${gespath:-/nwges/$envir}
+export COMIN=$COM_IN/gldas.${PDY}
+export COMOUT=$COM_OUT/gldas.${PDY}
+export COMOUTp1=$COM_OUT/gldas.${PDYp1}
 
-export GESdir=$gespath/cdas.$PDY
-mkdir -m 775 -p $GESdir
+export LOGDIR=${LOGDIR:-${COMROOT}/${NET}/${envir}/logdir}
 
-export COMROT=${COMROT:-$COMOUT}
-export RESDIR=${RESDIR:-$GESdir}
-
-mkdir -p $COMROT $RESDIR
+mkdir -m 775 -p $COMOUT $COMOUTp1 $LOGDIR
 
 env
-
+fi
 #############################################################
 # execute the script
+echo "----------${FCSTSH:-$HOMEgldas/scripts/exgdas_gldas.sh.ecf}----------"
+$HOMEgldas/scripts/exgdas_gldas.sh.ecf
 
-${GLDASSH:-../scripts/exdas_gldas.sh.ecf}
-
-#############################################################
 cat $pgmout
 
-msg="ENDED NORMALLY."
+msg="JGDAS_GLDAS ENDED NORMALLY."
 postmsg "$jlogfile" "$msg"
 
 ##############################
 # Remove the Temporary working directory
 ##############################
-cd $DATA_IN
-if [ ${RM_TMPDIR:-YES} = YES ] ; then rm -rf $DATA ; fi
-
+###if [ "$KEEPDATA" != "YES" ]; then rm -rf $DATA; fi
 
 date
-exit 0
